@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Parking Slot Finder | WTMP Course Project</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              900: '#1e3a8a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Bootstrap 5 CSS (for accessible Modals, Grid & Utilities) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+  <!-- Font Awesome 6 Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Leaflet Maps CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- Header / Navigation -->
+  <header class="sticky top-0 z-40 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- Logo & Title -->
+        <div class="flex items-center gap-3 cursor-pointer" onclick="App.switchTab('mapTab')">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+            <i class="fas fa-parking text-xl font-black"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-extrabold text-lg tracking-tight text-white">SmartPark<span class="text-blue-500">360</span></span>
+              <span class="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-blue-950 border border-blue-800 text-blue-300">
+                WTMP #27
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-400 hidden sm:block">Real-Time Parking Slot Finder & Booking System</p>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="hidden md:flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+          <button 
+            onclick="App.switchTab('mapTab')" 
+            data-tab-target="mapTab" 
+            class="nav-tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-blue-600 text-white shadow-md">
+            <i class="fas fa-map-location-dot"></i> Map View
+          </button>
+
+          <button 
+            onclick="App.switchTab('slotsTab')" 
+            data-tab-target="slotsTab" 
+            class="nav-tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-gray-300 hover:text-white hover:bg-gray-800">
+            <i class="fas fa-th-large"></i> Find Slots
+          </button>
+
+          <button 
+            onclick="App.switchTab('bookingsTab')" 
+            data-tab-target="bookingsTab" 
+            class="nav-tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-gray-300 hover:text-white hover:bg-gray-800">
+            <i class="fas fa-ticket-simple"></i> My Bookings
+          </button>
+
+          <button 
+            onclick="App.switchTab('adminTab')" 
+            data-tab-target="adminTab" 
+            id="navBtnAdmin"
+            class="nav-tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-gray-300 hover:text-white hover:bg-gray-800">
+            <i class="fas fa-user-shield text-purple-400"></i> Admin Panel
+          </button>
+
+          <button 
+            onclick="App.switchTab('apiTesterTab')" 
+            data-tab-target="apiTesterTab" 
+            class="nav-tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-gray-300 hover:text-white hover:bg-gray-800">
+            <i class="fas fa-network-wired text-emerald-400"></i> REST APIs
+          </button>
+
+          <button 
+            onclick="App.switchTab('vivaTab')" 
+            data-tab-target="vivaTab" 
+            class="nav-tab-btn px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-gray-300 hover:text-white hover:bg-gray-800">
+            <i class="fas fa-graduation-cap text-amber-400"></i> Viva & Docs
+          </button>
+        </nav>
+
+        <!-- Right Side: Clock & User Auth State -->
+        <div class="flex items-center gap-3">
+          <!-- Live Time Display -->
+          <div class="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300">
+            <i class="fas fa-clock text-blue-400 text-xs"></i>
+            <span id="liveClock">--:--:--</span>
+          </div>
+
+          <!-- Guest State (Not Logged In) -->
+          <div id="navGuestActions" class="flex items-center gap-2">
+            <button 
+              onclick="App.openAuthModal('login')" 
+              class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition shadow">
+              <i class="fas fa-sign-in-alt mr-1"></i> Log In
+            </button>
+
+            <!-- Quick Demo Login Dropdown for Evaluator -->
+            <div class="dropdown">
+              <button 
+                class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 dropdown-toggle" 
+                type="button" 
+                data-bs-toggle="dropdown">
+                <i class="fas fa-magic text-yellow-400 mr-1"></i> Demo
+              </button>
+              <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow-xl border border-slate-700 bg-slate-900 text-xs">
+                <li><h6 class="dropdown-header text-[10px] uppercase tracking-wider text-slate-400">1-Click Evaluation Sign-in</h6></li>
+                <li>
+                  <a class="dropdown-item py-2 cursor-pointer" onclick="App.quickDemoLogin('user@example.com', 'user123')">
+                    <i class="fas fa-user text-blue-400 mr-2"></i> Demo Driver (Regular User)
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item py-2 cursor-pointer" onclick="App.quickDemoLogin('admin@smartparking.com', 'admin123')">
+                    <i class="fas fa-user-shield text-purple-400 mr-2"></i> Demo Administrator
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider border-slate-800"></li>
+                <li>
+                  <a class="dropdown-item py-2 text-rose-400 cursor-pointer" onclick="App.reseedDemoData()">
+                    <i class="fas fa-rotate mr-2"></i> Reset & Re-seed Database
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Authenticated User State -->
+          <div id="navUserActions" class="hidden flex items-center gap-3">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-full bg-blue-900/60 border border-blue-700 flex items-center justify-center text-blue-300 font-bold text-xs">
+                <i class="fas fa-user"></i>
+              </div>
+              <div class="hidden sm:block text-left">
+                <div class="text-xs font-bold text-white leading-none" id="navUserName">User</div>
+                <div class="mt-0.5">
+                  <span id="navUserRole" class="text-[10px] px-2 py-0.5 rounded font-black bg-blue-900 text-blue-200 border border-blue-700">DRIVER</span>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onclick="App.logout()" 
+              title="Log Out" 
+              class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-rose-900/60 hover:border-rose-700 text-slate-300 hover:text-rose-200 border border-slate-700 flex items-center justify-center text-xs transition">
+              <i class="fas fa-power-off"></i>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Mobile Subnav Bar -->
+      <div class="flex md:hidden overflow-x-auto py-2 gap-2 border-t border-slate-800/80">
+        <button onclick="App.switchTab('mapTab')" class="px-3 py-1 rounded-md text-xs font-bold bg-blue-600 text-white whitespace-nowrap">Map</button>
+        <button onclick="App.switchTab('slotsTab')" class="px-3 py-1 rounded-md text-xs font-bold bg-slate-800 text-slate-300 whitespace-nowrap">Slots</button>
+        <button onclick="App.switchTab('bookingsTab')" class="px-3 py-1 rounded-md text-xs font-bold bg-slate-800 text-slate-300 whitespace-nowrap">Bookings</button>
+        <button onclick="App.switchTab('adminTab')" class="px-3 py-1 rounded-md text-xs font-bold bg-slate-800 text-slate-300 whitespace-nowrap">Admin</button>
+        <button onclick="App.switchTab('apiTesterTab')" class="px-3 py-1 rounded-md text-xs font-bold bg-slate-800 text-slate-300 whitespace-nowrap">REST API</button>
+        <button onclick="App.switchTab('vivaTab')" class="px-3 py-1 rounded-md text-xs font-bold bg-slate-800 text-slate-300 whitespace-nowrap">Viva Docs</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- ================= TAB 1: MAP VIEW ================= -->
+    <section id="mapTab" class="tab-content-section space-y-6">
+      
+      <!-- Banner / Search Bar -->
+      <div class="glass-panel p-6 rounded-2xl border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+              <i class="fas fa-signal mr-1"></i> SENSORS ACTIVE
+            </span>
+            <span class="text-xs text-slate-400">Real-time GPS Tracking</span>
+          </div>
+          <h2 class="text-2xl font-black text-white tracking-tight mt-1.5">Interactive Smart Parking Map View</h2>
+          <p class="text-sm text-slate-400 mt-1">
+            Locate multi-level smart parking facilities, check live free slot counts, and tap pins to reserve immediately.
+          </p>
+        </div>
+
+        <!-- Search Input -->
+        <div class="flex items-center gap-2 w-full md:w-80">
+          <div class="relative flex-1">
+            <i class="fas fa-search absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+            <input 
+              type="text" 
+              id="mapSearchInput" 
+              placeholder="Search area (e.g. Hitec, Banjara)..." 
+              oninput="MapModule.loadLocationsOnMap(this.value)"
+              class="w-full bg-slate-950/90 border border-slate-700 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+            />
+          </div>
+          <button 
+            onclick="MapModule.refreshMap()" 
+            title="Refresh Map Pins" 
+            class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs border border-slate-700 transition">
+            <i class="fas fa-arrows-rotate"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Leaflet Map Canvas -->
+      <div class="glass-panel p-2 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden relative">
+        <div id="map"></div>
+
+        <!-- Map Legend Floating Overlay -->
+        <div class="absolute bottom-6 right-6 z-20 bg-slate-900/90 backdrop-blur-md p-3 rounded-xl border border-slate-700 shadow-xl text-xs space-y-1.5 pointer-events-auto">
+          <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">Occupancy Legend</div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-emerald-500 shadow-sm"></span>
+            <span class="text-slate-200">&gt; 4 Slots Free (High Availability)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-amber-500 shadow-sm"></span>
+            <span class="text-slate-200">1 - 4 Slots Free (Filling Fast)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-rose-500 shadow-sm"></span>
+            <span class="text-slate-200">0 Free (Lot Full)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Highlights Bar -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="glass-card p-4 rounded-xl border border-slate-800 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-blue-950/70 border border-blue-800 flex items-center justify-center text-blue-400 text-lg">
+            <i class="fas fa-map-pin"></i>
+          </div>
+          <div>
+            <span class="text-xs text-slate-400">Integrated Locations</span>
+            <h4 class="text-lg font-bold text-white">5 Smart Hubs Active</h4>
+          </div>
+        </div>
+
+        <div class="glass-card p-4 rounded-xl border border-slate-800 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-emerald-950/70 border border-emerald-800 flex items-center justify-center text-emerald-400 text-lg">
+            <i class="fas fa-charging-station text-yellow-400"></i>
+          </div>
+          <div>
+            <span class="text-xs text-slate-400">EV Fast Charging</span>
+            <h4 class="text-lg font-bold text-white">Supported across Hubs</h4>
+          </div>
+        </div>
+
+        <div class="glass-card p-4 rounded-xl border border-slate-800 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-purple-950/70 border border-purple-800 flex items-center justify-center text-purple-400 text-lg">
+            <i class="fas fa-qrcode"></i>
+          </div>
+          <div>
+            <span class="text-xs text-slate-400">Contactless Entry</span>
+            <h4 class="text-lg font-bold text-white">Instant QR Barrier Pass</h4>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ================= TAB 2: FIND & BOOK SLOTS ================= -->
+    <section id="slotsTab" class="tab-content-section hidden space-y-6">
+
+      <!-- Dynamic Location Info Banner -->
+      <div id="locationInfoBanner"></div>
+
+      <!-- Filter and Control Bar -->
+      <div class="glass-panel p-4 rounded-xl border border-slate-800 shadow-lg flex flex-wrap items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center gap-3 flex-1">
+          
+          <!-- Select Location -->
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              <i class="fas fa-building text-blue-400 mr-1"></i> Parking Facility
+            </label>
+            <select id="slotLocationFilter" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+              <option value="">Loading facilities...</option>
+            </select>
+          </div>
+
+          <!-- Floor Filter -->
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              <i class="fas fa-layer-group text-purple-400 mr-1"></i> Floor / Zone
+            </label>
+            <select id="slotFloorFilter" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+              <option value="">All Floors</option>
+            </select>
+          </div>
+
+          <!-- Vehicle Type Filter -->
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              <i class="fas fa-car text-emerald-400 mr-1"></i> Vehicle Type
+            </label>
+            <select id="slotVehicleTypeFilter" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+              <option value="">All Vehicle Types</option>
+              <option value="car">🚗 Car / Sedan</option>
+              <option value="suv">🚙 SUV / Large Vehicle</option>
+              <option value="bike">🏍️ Two-Wheeler / Bike</option>
+              <option value="ev">⚡ EV (With Charger)</option>
+              <option value="accessible">♿ Accessible Priority</option>
+            </select>
+          </div>
+
+          <!-- Status Filter -->
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              <i class="fas fa-filter text-amber-400 mr-1"></i> Availability Status
+            </label>
+            <select id="slotStatusFilter" class="bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+              <option value="">All Statuses</option>
+              <option value="available">🟢 Available Only</option>
+              <option value="reserved">🟡 Reserved</option>
+              <option value="occupied">🔴 Occupied</option>
+            </select>
+          </div>
+
+        </div>
+
+        <!-- Quick Info Tip -->
+        <div class="text-right text-xs text-slate-400 hidden xl:block">
+          <i class="fas fa-hand-pointer text-blue-400 mr-1"></i>
+          <span>Click any <strong>Available</strong> green slot to reserve</span>
+        </div>
+      </div>
+
+      <!-- Real-Time Interactive Parking Bay Visualizer -->
+      <div class="glass-panel p-6 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-blue-900/60 border border-blue-700 flex items-center justify-center text-blue-300">
+              <i class="fas fa-square-parking"></i>
+            </div>
+            <div>
+              <h3 class="text-lg font-bold text-white">Live Parking Bays Grid</h3>
+              <p class="text-xs text-slate-400">Automated bay sensors update status dynamically</p>
+            </div>
+          </div>
+
+          <!-- Color Key -->
+          <div class="hidden sm:flex items-center gap-3 text-xs">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Available</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Reserved</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Occupied</span>
+          </div>
+        </div>
+
+        <!-- Grid Container -->
+        <div id="slotsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <!-- Slots rendered via slots.js -->
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ================= TAB 3: MY BOOKINGS ================= -->
+    <section id="bookingsTab" class="tab-content-section hidden space-y-6">
+      
+      <div class="glass-panel p-6 rounded-2xl border border-slate-800 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-2xl font-black text-white tracking-tight">Driver Reservation Dashboard</h2>
+          <p class="text-sm text-slate-400 mt-1">
+            View active parking permits, barcode entry passes, check-in upon arrival, or cancel bookings.
+          </p>
+        </div>
+
+        <button onclick="BookingsModule.loadMyBookings()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 flex items-center gap-2">
+          <i class="fas fa-arrows-rotate text-blue-400"></i> Refresh Permits
+        </button>
+      </div>
+
+      <!-- Bookings List Container -->
+      <div id="myBookingsList" class="space-y-4">
+        <!-- Rendered via bookings.js -->
+      </div>
+
+    </section>
+
+    <!-- ================= TAB 4: ADMIN PANEL ================= -->
+    <section id="adminTab" class="tab-content-section hidden space-y-6">
+      <div id="adminPanelContainer">
+        <!-- Rendered via admin.js -->
+      </div>
+    </section>
+
+    <!-- ================= TAB 5: REST API INTERACTIVE TESTER ================= -->
+    <section id="apiTesterTab" class="tab-content-section hidden space-y-6">
+      <div id="apiTesterContainer">
+        <!-- Rendered via apiTester.js -->
+      </div>
+    </section>
+
+    <!-- ================= TAB 6: VIVA & DOCUMENTATION ================= -->
+    <section id="vivaTab" class="tab-content-section hidden space-y-6">
+      
+      <!-- Viva Heading -->
+      <div class="glass-panel p-6 rounded-2xl border border-slate-800 shadow-xl">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-blue-900 text-blue-200 border border-blue-700">
+            WTMP COURSE EVALUATION
+          </span>
+          <span class="text-xs text-slate-400">Evaluation Date: 16-11-2026</span>
+        </div>
+        <h2 class="text-2xl font-black text-white">Project #27: Smart Parking Slot Finder</h2>
+        <p class="text-sm text-slate-300 mt-2 leading-relaxed">
+          <strong>Problem Statement:</strong> Drivers waste excessive time and fuel searching for available parking spaces in congested commercial and urban hubs. This system provides a map-based booking and real-time availability tracking solution to eliminate parking hunting and optimize facility capacity.
+        </p>
+      </div>
+
+      <!-- Prescribed Syllabus Compliance Grid -->
+      <div class="glass-card p-6 rounded-2xl border border-slate-800">
+        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <i class="fas fa-check-double text-emerald-400"></i>
+          Syllabus Technology Compliance Verification
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="font-mono font-bold text-blue-400 text-sm block mb-1">Frontend Layer</span>
+            <ul class="space-y-1 text-slate-300">
+              <li>• <strong>HTML5 & CSS3:</strong> Semantic structure & responsive grid</li>
+              <li>• <strong>JavaScript (ES6):</strong> Async/await, modules, fetch API</li>
+              <li>• <strong>Tailwind CSS & Bootstrap 5:</strong> Modern glassmorphic styling, responsive layout & accessible modals</li>
+              <li>• <strong>Maps API:</strong> Leaflet.js with OpenStreetMap coordinates</li>
+            </ul>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="font-mono font-bold text-purple-400 text-sm block mb-1">Backend REST API</span>
+            <ul class="space-y-1 text-slate-300">
+              <li>• <strong>Node.js:</strong> Scalable asynchronous JavaScript runtime</li>
+              <li>• <strong>Express.js:</strong> RESTful routing architecture</li>
+              <li>• <strong>All 4 HTTP Methods:</strong> GET, POST, PUT, DELETE implemented</li>
+              <li>• <strong>Centralized Error Handler:</strong> Standardized JSON responses</li>
+            </ul>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="font-mono font-bold text-emerald-400 text-sm block mb-1">Database & Security</span>
+            <ul class="space-y-1 text-slate-300">
+              <li>• <strong>MongoDB & Mongoose:</strong> Document storage with ODM schemas</li>
+              <li>• <strong>JWT (jsonwebtoken):</strong> Stateless Bearer token auth</li>
+              <li>• <strong>bcryptjs:</strong> Salted password hashing (10 rounds)</li>
+              <li>• <strong>Role-Based Access:</strong> User vs Admin access guards</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- REST API Architecture Matrix -->
+      <div class="glass-card p-6 rounded-2xl border border-slate-800 overflow-hidden">
+        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <i class="fas fa-network-wired text-blue-400"></i>
+          Complete REST API Specification & HTTP Methods
+        </h3>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900 text-slate-400 uppercase font-semibold border-b border-slate-800">
+              <tr>
+                <th class="p-3">Method</th>
+                <th class="p-3">Endpoint Route</th>
+                <th class="p-3">Access Guard</th>
+                <th class="p-3">Purpose / CRUD Operation</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800 font-mono">
+              <tr>
+                <td class="p-3"><span class="px-2 py-0.5 rounded font-black bg-emerald-950 text-emerald-400 border border-emerald-700">GET</span></td>
+                <td class="p-3 text-white">/api/locations</td>
+                <td class="p-3 text-slate-400">Public</td>
+                <td class="p-3 font-sans">Retrieve all parking locations with real-time slot counts</td>
+              </tr>
+              <tr>
+                <td class="p-3"><span class="px-2 py-0.5 rounded font-black bg-emerald-950 text-emerald-400 border border-emerald-700">GET</span></td>
+                <td class="p-3 text-white">/api/slots</td>
+                <td class="p-3 text-slate-400">Public</td>
+                <td class="p-3 font-sans">Query parking slots with location, floor & vehicleType filters</td>
+              </tr>
+              <tr>
+                <td class="p-3"><span class="px-2 py-0.5 rounded font-black bg-blue-950 text-blue-400 border border-blue-700">POST</span></td>
+                <td class="p-3 text-white">/api/auth/register</td>
+                <td class="p-3 text-slate-400">Public</td>
+                <td class="p-3 font-sans">Register driver/admin with bcryptjs password hashing</td>
+              </tr>
+              <tr>
+                <td class="p-3"><span class="px-2 py-0.5 rounded font-black bg-blue-950 text-blue-400 border border-blue-700">POST</span></td>
+                <td class="p-3 text-white">/api/auth/login</td>
+                <td class="p-3 text-slate-400">Public</td>
+                <td class="p-3 font-sans">Authenticate credentials & issue signed JWT Bearer token</td>
+              </tr>
+              <tr>
+                <td class="p-3"><span class="px-2 py-0.5 rounded font-black bg-blue-950 text-blue-400 border border-blue-700">POST</span></td>
+                <td class="p-3 text-white">/api/bookings</td>
+                <td class="p-3 text-purple-300">JWT User</td>
+                <td class="p-3 font-sans">Create slot reservation, update slot to reserved, issue ticket</td>
+              </tr>
+              <tr>
+                <td class="p-3"><span class="px-2 py-0.5 rounded font-black bg-blue-950 text-blue-400 border border-blue-700">POST</span></td>
+                <td class="p-3 text-white">/api/slots</td>
+                <td class="p-3 text-purple-300">Admin Only</td>
+                <td class="p-3 font-sans">Create a new smart parking slot in a location</td>
+              </tr>
+              <tr>
+                <td class="p-3"><span class="px-2 py-0.5 rounded font-black bg-amber-950 text-amber-400 border border-amber-700">PUT</span></td>
+                <td class="p-3 text-white">/api/bookings/:id/status</td>
+                <td class="p-3 text-purple-300">JWT User/Admin</td>
+                <td class="p-3 font-sans">Update reservation to checked_in or completed (frees slot)</td>
+              </tr>
+              <tr>
+                <td class="p-3"><span class="px-2 py-0.5 rounded font-black bg-amber-950 text-amber-400 border border-amber-700">PUT</span></td>
+                <td class="p-3 text-white">/api/slots/:id/toggle</td>
+                <td class="p-3 text-purple-300">Admin Only</td>
+                <td class="p-3 font-sans">Toggle slot availability & simulate IoT sensor detection</td>
+              </tr>
+              <tr>
+                <td class="p-3"><span class="px-2 py-0.5 rounded font-black bg-rose-950 text-rose-400 border border-rose-700">DELETE</span></td>
+                <td class="p-3 text-white">/api/bookings/:id</td>
+                <td class="p-3 text-purple-300">JWT User/Admin</td>
+                <td class="p-3 font-sans">Cancel active booking and automatically release slot back to available</td>
+              </tr>
+              <tr>
+                <td class="p-3"><span class="px-2 py-0.5 rounded font-black bg-rose-950 text-rose-400 border border-rose-700">DELETE</span></td>
+                <td class="p-3 text-white">/api/slots/:id</td>
+                <td class="p-3 text-purple-300">Admin Only</td>
+                <td class="p-3 font-sans">Delete a parking slot from the facility inventory</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Viva Q&A Guide for Students -->
+      <div class="glass-card p-6 rounded-2xl border border-slate-800">
+        <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <i class="fas fa-question-circle text-yellow-400"></i>
+          Key Evaluation Viva Questions & Model Answers
+        </h3>
+
+        <div class="space-y-4 text-xs">
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <h5 class="font-bold text-white text-sm">Q1: How is JWT authentication and password security implemented?</h5>
+            <p class="text-slate-300 mt-1 leading-relaxed">
+              <strong>Answer:</strong> When a user registers, their raw password is run through <code class="text-emerald-400 font-mono">bcryptjs.genSalt(10)</code> and hashed via a Mongoose pre-save hook. When logging in, <code class="text-emerald-400 font-mono">bcryptjs.compare()</code> verifies the credential. Upon match, a JSON Web Token signed with a private secret (<code class="text-blue-400 font-mono">jwt.sign({ id })</code>) is issued and stored in <code class="text-blue-400 font-mono">localStorage</code>. For all protected endpoints, the token is passed in the <code class="text-purple-400 font-mono">Authorization: Bearer &lt;token&gt;</code> header and decoded in the <code class="text-blue-400 font-mono">authMiddleware</code>.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <h5 class="font-bold text-white text-sm">Q2: How does the system handle real-time slot state transitions?</h5>
+            <p class="text-slate-300 mt-1 leading-relaxed">
+              <strong>Answer:</strong> Each parking slot maintains a status enum (<code class="text-green-400 font-mono">available</code>, <code class="text-amber-400 font-mono">reserved</code>, <code class="text-red-400 font-mono">occupied</code>, <code class="text-slate-400 font-mono">maintenance</code>). When a driver submits a booking (POST /api/bookings), the slot status transitions to <code class="text-amber-400 font-mono">reserved</code>. Upon gate check-in (PUT /api/bookings/:id/status), it becomes <code class="text-red-400 font-mono">occupied</code>. When the driver checks out or cancels (DELETE /api/bookings/:id), the slot is automatically released back to <code class="text-green-400 font-mono">available</code>.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <h5 class="font-bold text-white text-sm">Q3: How are the Maps API coordinates rendered?</h5>
+            <p class="text-slate-300 mt-1 leading-relaxed">
+              <strong>Answer:</strong> We use Leaflet.js connected with OpenStreetMap tile servers. Each parking facility document in MongoDB stores precise geographic coordinates (<code class="text-blue-400 font-mono">{ lat, lng }</code>). The frontend renders dynamic divIcons colored according to real-time capacity (green if available &gt; 4, yellow if &lt;= 4, red if full), with interactive popups allowing one-click navigation to the slot booking grid.
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 bg-slate-950 py-6 text-center text-xs text-slate-500 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div>
+        <strong class="text-slate-300">Smart Parking Slot Finder</strong> — WTMP Course Project Evaluation (16-11-2026)
+      </div>
+      <div class="flex items-center gap-4">
+        <span>Node.js • Express • MongoDB • Leaflet • JWT • bcryptjs</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- 1. Authentication Modal (Login & Register) -->
+  <div class="modal fade" id="authModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-slate-900 text-slate-100 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
+        
+        <!-- Modal Tabs -->
+        <div class="flex border-b border-slate-800 text-xs font-bold text-center">
+          <button id="tabAuthLogin" onclick="App.openAuthModal('login')" class="flex-1 py-3 border-b-2 border-blue-500 text-blue-400 transition">
+            <i class="fas fa-sign-in-alt mr-1"></i> Driver / Admin Login
+          </button>
+          <button id="tabAuthRegister" onclick="App.openAuthModal('register')" class="flex-1 py-3 border-b-2 border-transparent text-slate-400 hover:text-white transition">
+            <i class="fas fa-user-plus mr-1"></i> Register New Account
+          </button>
+        </div>
+
+        <div class="modal-body p-6">
+          
+          <!-- Login Pane -->
+          <div id="authLoginPane">
+            <form id="loginForm" class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Email Address</label>
+                <input type="email" id="loginEmail" required placeholder="name@example.com" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Password</label>
+                <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500" />
+              </div>
+              <button type="submit" id="btnLoginSubmit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow transition">
+                <i class="fas fa-sign-in-alt mr-1"></i> Log In
+              </button>
+            </form>
+
+            <div class="mt-5 pt-4 border-t border-slate-800 text-center">
+              <span class="text-[11px] text-slate-400 block mb-2 font-semibold">Quick 1-Click Evaluation Logins:</span>
+              <div class="grid grid-cols-2 gap-2">
+                <button onclick="App.quickDemoLogin('user@example.com', 'user123')" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-blue-300 rounded-lg text-xs font-semibold border border-slate-700">
+                  <i class="fas fa-user mr-1"></i> Demo User
+                </button>
+                <button onclick="App.quickDemoLogin('admin@smartparking.com', 'admin123')" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 rounded-lg text-xs font-semibold border border-slate-700">
+                  <i class="fas fa-user-shield mr-1"></i> Demo Admin
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Register Pane -->
+          <div id="authRegisterPane" class="hidden">
+            <form id="registerForm" class="space-y-3">
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Full Name</label>
+                <input type="text" id="regName" required placeholder="John Doe" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Email Address</label>
+                <input type="email" id="regEmail" required placeholder="john@example.com" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Phone Number</label>
+                <input type="tel" id="regPhone" placeholder="9876543210" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Password</label>
+                <input type="password" id="regPassword" required minlength="6" placeholder="Min 6 characters" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Account Role</label>
+                <select id="regRole" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                  <option value="user">Regular Driver (User)</option>
+                  <option value="admin">Parking Lot Manager (Admin)</option>
+                </select>
+              </div>
+              <button type="submit" id="btnRegSubmit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow transition mt-2">
+                <i class="fas fa-user-plus mr-1"></i> Create Account
+              </button>
+            </form>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Slot Booking Modal -->
+  <div class="modal fade" id="bookingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-slate-900 text-slate-100 border border-slate-700 rounded-2xl shadow-2xl">
+        <div class="modal-header border-b border-slate-800 p-4">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-emerald-950 border border-emerald-700 flex items-center justify-center text-emerald-400">
+              <i class="fas fa-bolt"></i>
+            </div>
+            <div>
+              <h5 class="modal-title font-bold text-white text-base">Reserve Parking Slot</h5>
+              <p class="text-[11px] text-slate-400">Instant reservation & digital permit pass</p>
+            </div>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+
+        <form id="bookingForm">
+          <input type="hidden" id="bookingSlotId" />
+          <div class="modal-body p-5 space-y-4">
+            
+            <!-- Slot Overview Card -->
+            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+              <div>
+                <span class="text-[10px] uppercase font-bold text-slate-400 block" id="modalFloor">Floor</span>
+                <h4 class="text-xl font-black text-white font-mono" id="modalSlotNumber">A-01</h4>
+                <p class="text-xs text-blue-400 font-semibold mt-0.5" id="modalLocationName">Location</p>
+              </div>
+              <div class="text-right">
+                <span class="text-[10px] uppercase font-bold text-slate-400 block" id="modalVehicleType">CAR</span>
+                <span class="text-lg font-black text-emerald-400" id="modalHourlyRate">₹40</span>
+                <span class="text-xs text-slate-400 block">/ hour</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Driver Name</label>
+                <input type="text" id="driverName" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Driver Contact</label>
+                <input type="tel" id="driverPhone" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-blue-500" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-400 mb-1">
+                Vehicle Registration # <span class="text-emerald-400 font-normal">(e.g. TS 09 AB 1234)</span>
+              </label>
+              <input type="text" id="vehicleNumber" required placeholder="TS 09 AB 1234" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white font-mono font-bold uppercase focus:outline-none focus:border-blue-500" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Arrival Date & Time</label>
+                <input type="datetime-local" id="bookingStartTime" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-blue-500" />
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Duration (Hours)</label>
+                <input type="number" id="bookingDuration" min="1" max="24" value="2" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-blue-500" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Payment Method</label>
+              <select id="paymentMethod" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                <option value="UPI">UPI (Google Pay / PhonePe / Paytm)</option>
+                <option value="Credit/Debit Card">Credit / Debit Card</option>
+                <option value="Cash on Arrival">Cash on Entry Gate</option>
+              </select>
+            </div>
+
+            <!-- Dynamic Cost Summary -->
+            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+              <div>
+                <span class="text-slate-400 block">Calculation: <span id="calcDuration">2 hrs</span> × <span id="calcRate">₹40/hr</span></span>
+                <span class="font-bold text-slate-300">Total Payable:</span>
+              </div>
+              <div class="text-xl font-black text-emerald-400 font-mono" id="calcTotal">
+                ₹80
+              </div>
+            </div>
+
+          </div>
+
+          <div class="modal-footer border-t border-slate-800 p-4">
+            <button type="button" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" id="btnConfirmBooking" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow transition flex items-center gap-1.5">
+              <i class="fas fa-check-circle"></i> Confirm & Pay
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Digital Permit Ticket Pass Modal -->
+  <div class="modal fade" id="bookingTicketModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-slate-900 text-slate-100 border border-slate-700 rounded-2xl shadow-2xl">
+        <div class="modal-header border-b border-slate-800 p-4">
+          <div class="flex items-center gap-2">
+            <i class="fas fa-ticket text-blue-400 text-lg"></i>
+            <h5 class="modal-title font-bold text-white text-base">Smart Parking Permit Pass</h5>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body p-6">
+          <div class="ticket-container p-6 shadow-xl text-center">
+            
+            <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
+              <div class="text-left">
+                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest block">PERMIT CODE</span>
+                <span class="text-xl font-black text-blue-600 font-mono" id="ticketBookingCode">PRK-0000</span>
+              </div>
+              <span class="px-2.5 py-1 rounded bg-green-100 text-green-800 font-bold text-[11px]" id="ticketStatus">CONFIRMED</span>
+            </div>
+
+            <!-- QR code container -->
+            <div id="ticketQrContainer" class="my-4"></div>
+
+            <div class="grid grid-cols-2 gap-3 text-left bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs my-4">
+              <div>
+                <span class="text-[10px] text-gray-500 uppercase block font-semibold">Location</span>
+                <span class="font-bold text-gray-800" id="ticketLocation">Cyber Towers</span>
+              </div>
+              <div>
+                <span class="text-[10px] text-gray-500 uppercase block font-semibold">Bay Slot</span>
+                <span class="font-black text-blue-600 text-sm font-mono" id="ticketSlotNumber">A-01</span>
+              </div>
+              <div>
+                <span class="text-[10px] text-gray-500 uppercase block font-semibold">Vehicle #</span>
+                <span class="font-mono font-bold text-gray-800" id="ticketVehicle">TS 09 AB 1234</span>
+              </div>
+              <div>
+                <span class="text-[10px] text-gray-500 uppercase block font-semibold">Paid Amount</span>
+                <span class="font-bold text-green-700 text-sm font-mono" id="ticketAmount">₹80</span>
+              </div>
+              <div class="col-span-2">
+                <span class="text-[10px] text-gray-500 uppercase block font-semibold">Driver</span>
+                <span class="text-gray-700" id="ticketDriver">Sai Venkat</span>
+              </div>
+              <div class="col-span-2">
+                <span class="text-[10px] text-gray-500 uppercase block font-semibold">Permit Window</span>
+                <span class="text-gray-700 font-mono text-[11px]" id="ticketTimes">Today 10:00 AM → 12:00 PM</span>
+              </div>
+            </div>
+
+            <p class="text-[10px] text-gray-500 italic">
+              Scan this QR code at the automated entrance boom barrier to trigger sensor gate open.
+            </p>
+          </div>
+        </div>
+
+        <div class="modal-footer border-t border-slate-800 p-4 flex justify-between">
+          <button onclick="window.print()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg flex items-center gap-1.5 border border-slate-700">
+            <i class="fas fa-print"></i> Print Ticket Pass
+          </button>
+          <button type="button" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Add Slot Modal (Admin) -->
+  <div class="modal fade" id="addSlotModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-slate-900 text-slate-100 border border-slate-700 rounded-2xl shadow-2xl">
+        <div class="modal-header border-b border-slate-800 p-4">
+          <h5 class="modal-title font-bold text-white text-base">Add New Parking Slot (POST /api/slots)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="addSlotForm">
+          <div class="modal-body p-5 space-y-3">
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Parking Facility Location</label>
+              <select id="newSlotLocation" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white"></select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Slot Identifier</label>
+                <input type="text" id="newSlotNumber" required placeholder="D-01" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white uppercase font-mono" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Floor / Level</label>
+                <input type="text" id="newSlotFloor" placeholder="Ground Level" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Vehicle Type</label>
+                <select id="newSlotType" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white">
+                  <option value="car">Car</option>
+                  <option value="suv">SUV</option>
+                  <option value="bike">Bike</option>
+                  <option value="ev">EV Charger</option>
+                  <option value="accessible">Accessible Priority</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Hourly Rate (₹)</label>
+                <input type="number" id="newSlotRate" value="40" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+              </div>
+            </div>
+            <div class="flex items-center gap-4 pt-1">
+              <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                <input type="checkbox" id="newSlotCharging" class="rounded bg-slate-950 border-slate-700 text-blue-600" />
+                <span>EV Charging Station Available</span>
+              </label>
+              <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                <input type="checkbox" id="newSlotAccessible" class="rounded bg-slate-950 border-slate-700 text-blue-600" />
+                <span>Accessible / Wheelchair Priority</span>
+              </label>
+            </div>
+          </div>
+          <div class="modal-footer border-t border-slate-800 p-4">
+            <button type="button" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-lg" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg">Create Slot</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Add Location Modal (Admin) -->
+  <div class="modal fade" id="addLocationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-slate-900 text-slate-100 border border-slate-700 rounded-2xl shadow-2xl">
+        <div class="modal-header border-b border-slate-800 p-4">
+          <h5 class="modal-title font-bold text-white text-base">Add Parking Facility (POST /api/locations)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="addLocationForm">
+          <div class="modal-body p-5 space-y-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Facility Name</label>
+                <input type="text" id="newLocName" required placeholder="Central Mall Deck" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Code</label>
+                <input type="text" id="newLocCode" required placeholder="CENTRAL-06" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white uppercase font-mono" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Address</label>
+                <input type="text" id="newLocAddress" required placeholder="MG Road" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">City</label>
+                <input type="text" id="newLocCity" value="Hyderabad" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Latitude</label>
+                <input type="number" step="any" id="newLocLat" value="17.4400" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Longitude</label>
+                <input type="number" step="any" id="newLocLng" value="78.3900" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Base Rate (₹/hr)</label>
+                <input type="number" id="newLocRate" value="40" required class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Operating Hours</label>
+                <input type="text" id="newLocHours" value="24/7 Open" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Description</label>
+              <textarea id="newLocDesc" rows="2" placeholder="Multi-story automated facility with EV points." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-white"></textarea>
+            </div>
+          </div>
+          <div class="modal-footer border-t border-slate-800 p-4">
+            <button type="button" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-lg" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg">Create Location</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col items-end max-w-sm w-full pointer-events-none"></div>
+
+  <!-- Bootstrap 5 Bundle JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Application Modules -->
+  <script src="/js/api.js"></script>
+  <script src="/js/map.js"></script>
+  <script src="/js/slots.js"></script>
+  <script src="/js/bookings.js"></script>
+  <script src="/js/admin.js"></script>
+  <script src="/js/apiTester.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
